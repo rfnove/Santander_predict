@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Previsão | Consórcios (Databricks Dark)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+
+        /* Grid e Ranking */
+        .middle-grid { display: grid; grid-template-columns: 3fr 1fr; gap: 24px; margin-bottom: 32px; }
+        .ranking-section { background: var(--sidebar-bg); padding: 24px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--card-shadow); display: flex; flex-direction: column;}
+        .ranking-sub { font-size: 12px; color: var(--text-muted); margin-top: -12px; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+        .ranking-item { display: flex; justify-content: space-between; align-items: center; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .ranking-item:last-child { border-bottom: none; }
+        .rank-pos { font-size: 16px; font-weight: 700; color: var(--text-muted); width: 28px; }
+        .rank-estado { font-weight: 600; color: #ffffff; flex: 1; font-size: 14px; }
+        .rank-valor-pos { font-weight: 700; color: var(--success); font-size: 14px; }
+        .rank-valor-neg { font-weight: 700; color: var(--danger); font-size: 14px; }
+        
+        @media (max-width: 1100px) {
+            .middle-grid { grid-template-columns: 1fr; }
+        }
+        /* Paleta Databricks Dark Mode */
+        :root {
+            --bg-color: #121620;          /* Fundo principal bem escuro */
+            --sidebar-bg: #1b1f2b;        /* Fundo da barra lateral e cartões */
+            --text-main: #e2e8f0;         /* Texto principal claro */
+            --text-muted: #8b95a5;        /* Texto secundário (cinza azulado) */
+            --primary: #FF3621;           /* Laranja/Vermelho Databricks */
+            --primary-hover: #e02917;
+            --blue-accent: #2A7BED;       /* Azul Databricks para gráficos */
+            --success: #10b981;           /* Verde para otimista */
+            --danger: #ef4444;            /* Vermelho para pessimista */
+            --border: #2d3546;            /* Bordas e divisórias */
+            --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); display: flex; min-height: 100vh; }
+
+        /* Sidebar */
+        .sidebar { width: 280px; background-color: var(--sidebar-bg); border-right: 1px solid var(--border); padding: 24px; display: flex; flex-direction: column; }
+        .logo { font-size: 20px; font-weight: 700; color: var(--primary); margin-bottom: 32px; display: flex; align-items: center; gap: 10px; }
+        
+        /* Controles */
+        .control-group { margin-bottom: 24px; }
+        .control-group label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        select { 
+            width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; 
+            background-color: #121620; color: var(--text-main); outline: none; transition: 0.2s; 
+        }
+        select:focus { border-color: var(--blue-accent); box-shadow: 0 0 0 2px rgba(42, 123, 237, 0.2); }
+        
+        input[type="range"] { width: 100%; cursor: pointer; accent-color: var(--primary); }
+        
+        .slider-value { text-align: right; font-size: 14px; font-weight: 600; color: var(--text-main); margin-top: 8px; }
+        
+        .btn-export { 
+            margin-top: auto; padding: 12px; background-color: var(--primary); color: white; border: none; 
+            border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.2s; width: 100%; 
+        }
+        .btn-export:hover { background-color: var(--primary-hover); }
+
+        /* Main Content */
+        .main-content { flex: 1; padding: 32px; overflow-y: auto; }
+        .header { margin-bottom: 32px; }
+        .header h1 { font-size: 24px; margin-bottom: 8px; color: #ffffff; }
+        .header p { color: var(--text-muted); font-size: 15px; }
+
+        /* KPIs */
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 24px; margin-bottom: 32px; }
+        .kpi-card { background: var(--sidebar-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--card-shadow); }
+        .kpi-title { font-size: 12px; color: var(--text-muted); font-weight: 600; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;}
+        .kpi-value { font-size: 26px; font-weight: 700; margin-bottom: 8px; color: #ffffff; }
+        .kpi-sub { font-size: 13px; color: var(--text-muted); font-weight: 500; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);}
+        
+        /* Chart Area */
+        .chart-section { background: var(--sidebar-bg); padding: 24px; border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--card-shadow); margin-bottom: 32px; }
+        .section-title { font-size: 16px; font-weight: 600; margin-bottom: 20px; color: #ffffff; }
+
+        /* Table Area */
+        .table-section { background: var(--sidebar-bg); border-radius: 12px; border: 1px solid var(--border); box-shadow: var(--card-shadow); overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th { background-color: rgba(0,0,0,0.2); padding: 16px 20px; font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; border-bottom: 1px solid var(--border); }
+        td { padding: 16px 20px; font-size: 14px; border-bottom: 1px solid var(--border); color: var(--text-main); font-weight: 500;}
+        tr:hover { background-color: rgba(255,255,255,0.02); }
+        tr:last-child td { border-bottom: none; }
+        
+        /* Badges Dark Mode */
+        .badge-min { color: #fca5a5; font-size: 12px; font-weight: 600; background: rgba(239, 68, 68, 0.15); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(239, 68, 68, 0.3); }
+        .badge-max { color: #6ee7b7; font-size: 12px; font-weight: 600; background: rgba(16, 185, 129, 0.15); padding: 4px 8px; border-radius: 4px; border: 1px solid rgba(16, 185, 129, 0.3); }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5L2 8l10 5.5L22 8l-10-5.5zM2 11.5v5l10 5.5 10-5.5v-5l-10 5.5-10-5.5z"/></svg>
+            Consórcio Predict
+        </div>
+        <div class="control-group">
+            <label>Região de Análise</label>
+            <select id="estado"></select>
+        </div>
+        <div class="control-group">
+            <label>Horizonte Temporal (Meses)</label>
+            <input type="range" id="meses" min="3" max="12" step="3" value="6">
+            <div class="slider-value"><span id="meses-valor">6</span> Fwd</div>
+        </div>
+        <button class="btn-export" onclick="exportarCSV()">📥 Exportar Dataset</button>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <h1>Market Share: Consórcios Ativos</h1>
+            <p>Modelagem Preditiva com Intervalos de Confiança (MAE ajustado).</p>
+        </div>
+
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <div class="kpi-title">Cotas Ativas (Base Real)</div>
+                <div class="kpi-value" id="kpi-atual">0</div>
+                <div class="kpi-sub">Último fechamento consolidado</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Projeção do Modelo (Target)</div>
+                <div class="kpi-value" id="kpi-projecao" style="color: var(--blue-accent);">0</div>
+                <div class="kpi-sub" id="kpi-crescimento">Tendência: 0%</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Cenário Min (Pessimista)</div>
+                <div class="kpi-value" id="kpi-min" style="color: #fca5a5;">0</div>
+                <div class="kpi-sub" id="kpi-mae-txt">Limite Inferior da Margem</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-title">Cenário Max (Otimista)</div>
+                <div class="kpi-value" id="kpi-max" style="color: #6ee7b7;">0</div>
+                <div class="kpi-sub">Limite Superior da Margem</div>
+            </div>
+        </div>
+
+<div class="middle-grid">
+            <div class="chart-section" style="margin-bottom: 0;">
+                <div class="section-title">Evolução Histórica e Cone de Previsão</div>
+                <canvas id="mainChart" height="80"></canvas>
+            </div>
+            
+            <div class="ranking-section">
+                <div class="section-title">🔥 Regiões Quentes (Top 5)</div>
+                <div class="ranking-sub">Maior % de crescimento no período</div>
+                <div class="ranking-list" id="ranking-list">
+                    <div style="color: var(--text-muted); font-size: 13px; text-align: center; margin-top: 20px;">A calcular ranking...</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-section">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Período</th>
+                        <th>Cenário Pessimista (Min)</th>
+                        <th>Target (Base)</th>
+                        <th>Cenário Otimista (Max)</th>
+                    </tr>
+                </thead>
+                <tbody id="tabela-corpo">
+                    </tbody>
+            </table>
+        </div>
+
+    </div> <script>
+        // Configuração Global Chart.js para Dark Mode...
+        Chart.defaults.color = '#8b95a5';
+        Chart.defaults.font.family = "'Inter', sans-serif";
+
+        const baseEstados = {
+            'SP': 2600000, 'MG': 1200000, 'RJ': 950000, 'PR': 850000, 'RS': 800000, 'SC': 700000, 'BA': 650000, 'GO': 500000, 'PE': 450000, 'CE': 400000, 'PA': 350000, 'MT': 300000, 'ES': 280000, 'MA': 250000, 'PB': 200000, 'AM': 190000, 'RN': 180000, 'AL': 150000, 'MS': 140000, 'PI': 130000, 'DF': 120000, 'SE': 100000, 'RO': 90000, 'TO': 80000, 'AC': 50000, 'AP': 40000, 'RR': 30000
+        };
+
+        const selectEstado = document.getElementById('estado');
+        Object.keys(baseEstados).sort().forEach(sigla => {
+            let opt = document.createElement('option');
+            opt.value = sigla; opt.innerHTML = `Estado: ${sigla}`;
+            if(sigla === 'SP') opt.selected = true;
+            selectEstado.appendChild(opt);
+        });
+
+        const formatador = new Intl.NumberFormat('pt-BR');
+
+const ctx = document.getElementById('mainChart').getContext('2d');
+        let chart = new Chart(ctx, {
+            type: 'line',
+            data: { 
+                labels: [], 
+                datasets: [
+                    {
+                        label: 'Cenário Max',
+                        borderColor: '#10b981', // Verde
+                        borderWidth: 2,
+                        borderDash: [4, 4],     // Linha tracejada
+                        tension: 0.3,
+                        pointBackgroundColor: '#121620',
+                        data: []
+                    },
+                    {
+                        label: 'Cenário Min',
+                        borderColor: '#ef4444', // Vermelho
+                        borderWidth: 2,
+                        borderDash: [4, 4],     // Linha tracejada
+                        tension: 0.3,
+                        pointBackgroundColor: '#121620',
+                        data: []
+                    },
+                    {
+                        label: 'Target Base',
+                        borderColor: '#2A7BED', // Azul
+                        borderWidth: 3,
+                        borderDash: [6, 4],     // Linha tracejada mais grossa
+                        tension: 0.3,
+                        pointBackgroundColor: '#121620',
+                        data: []
+                    },
+                    {
+                        label: 'Histórico',
+                        borderColor: '#8b95a5', // Cinza
+                        borderWidth: 3,
+                        tension: 0.3,
+                        pointBackgroundColor: '#121620',
+                        fill: true,
+                        backgroundColor: 'rgba(139, 149, 165, 0.1)', // Sombra leve em baixo
+                        data: []
+                    }
+                ] 
+            },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                plugins: { 
+                    legend: { position: 'top', labels: { color: '#e2e8f0', usePointStyle: true, padding: 20 } },
+                    tooltip: {
+                        backgroundColor: '#1b1f2b',
+                        titleColor: '#ffffff',
+                        bodyColor: '#e2e8f0',
+                        borderColor: '#2d3546',
+                        borderWidth: 1,
+                        padding: 12,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) { label += ': '; }
+                                if (context.parsed.y !== null) {
+                                    label += formatador.format(Math.round(context.parsed.y));
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: { 
+                    y: { 
+                        beginAtZero: false, 
+                        grid: { color: '#2d3546', borderDash: [4, 4] },
+                        ticks: { color: '#8b95a5' }
+                    }, 
+                    x: { 
+                        grid: { display: false },
+                        ticks: { color: '#8b95a5' }
+                    } 
+                }
+            }
+        });
+
+        let dadosParaExportacao = [];
+
+async function gerarDados() {
+            const estado = document.getElementById('estado').value;
+            const mesesPrev = parseInt(document.getElementById('meses').value);
+            document.getElementById('meses-valor').innerText = mesesPrev;
+
+            document.getElementById('kpi-atual').innerText = "A calcular...";
+            document.getElementById('ranking-list').innerHTML = `<div style="color: var(--text-muted); font-size: 13px; text-align: center; margin-top: 20px;">A calcular ranking...</div>`;
+            
+            try {
+                // Chama as duas APIs ao mesmo tempo usando Promise.all (Mais Rápido e Otimizado)
+                const [resposta, respostaRanking] = await Promise.all([
+                    fetch(`http://localhost:5000/api/prever/${estado}/${mesesPrev}`),
+                    fetch(`http://localhost:5000/api/ranking/${mesesPrev}`)
+                ]);
+                
+                const dadosReais = await resposta.json();
+                const dadosRanking = await respostaRanking.json();
+
+                // (MANTENHA A SUA LÓGICA DE FILTRO DE MESES AQUI...)
+                let idxAtual = dadosReais.historico.findIndex(v => v === null) - 1;
+                if (idxAtual < 0) idxAtual = dadosReais.historico.length - 1; 
+
+                let labelsFilt = [], histFilt = [], baseFilt = [], minFilt = [], maxFilt = [];
+
+                for (let i = 0; i < dadosReais.labels.length; i++) {
+                    if (Math.abs(i - idxAtual) % 3 === 0) {
+                        labelsFilt.push(dadosReais.labels[i]);
+                        histFilt.push(dadosReais.historico[i]);
+                        baseFilt.push(dadosReais.prevBase[i]);
+                        minFilt.push(dadosReais.prevMin[i]);
+                        maxFilt.push(dadosReais.prevMax[i]);
+                    }
+                }
+
+                dadosParaExportacao = []; 
+                for(let i = 0; i < labelsFilt.length; i++) {
+                    if(baseFilt[i] !== null && histFilt[i] === null) {
+                        dadosParaExportacao.push({
+                            periodo: labelsFilt[i],
+                            estado: estado,
+                            cotas_min: Math.max(0, Math.round(minFilt[i])),
+                            cotas_base: Math.max(0, Math.round(baseFilt[i])),
+                            cotas_max: Math.max(0, Math.round(maxFilt[i]))
+                        });
+                    }
+                }
+
+                // 4. Passa os arrays purificados para desenhar a tela
+                atualizarInterface(histFilt, baseFilt, minFilt, maxFilt, labelsFilt);
+                atualizarTabela(histFilt, baseFilt, minFilt, maxFilt, labelsFilt);
+                
+                // NOVO: Renderiza o Ranking
+                atualizarRanking(dadosRanking);
+                
+            } catch (error) {
+                console.error("Erro ao comunicar com o Python:", error);
+                document.getElementById('kpi-atual').innerText = "Erro de Ligação";
+            }
+        }
+
+        // NOVO COMPONENTE: Função para desenhar o Top 5 no HTML
+        function atualizarRanking(dadosRanking) {
+            const container = document.getElementById('ranking-list');
+            container.innerHTML = '';
+            
+            if(dadosRanking.erro) {
+                container.innerHTML = `<div style="color: var(--danger); font-size: 13px;">Erro ao carregar</div>`;
+                return;
+            }
+
+            // Seleciona os 5 primeiros colocados
+            const top5 = dadosRanking.slice(0, 5);
+            
+            top5.forEach((item, index) => {
+                const tr = document.createElement('div');
+                tr.className = 'ranking-item';
+                
+                // Destacar o primeiro lugar com o Troféu
+                const icon = index === 0 ? '🏆' : `#${index + 1}`;
+                const colorClass = item.crescimento_pct > 0 ? 'rank-valor-pos' : 'rank-valor-neg';
+                const sinal = item.crescimento_pct > 0 ? '+' : '';
+
+                tr.innerHTML = `
+                    <div class="rank-pos">${icon}</div>
+                    <div class="rank-estado">Estado: ${item.estado}</div>
+                    <div class="${colorClass}">${sinal}${item.crescimento_pct.toFixed(1)}%</div>
+                `;
+                container.appendChild(tr);
+            });
+        }
+
+        function atualizarInterface(hist, pBase, pMin, pMax, labels) {
+            // Removemos o número fixo e encontramos dinamicamente onde o histórico termina
+            let indexAtual = hist.findIndex(v => v === null) - 1;
+            if (indexAtual < 0) indexAtual = hist.length - 1;
+
+            const valAtual = hist[indexAtual];
+            // Math.max(0, ...) garante que nenhuma projeção vai exibir valores negativos
+            const valFinal = Math.max(0, pBase[pBase.length - 1]);
+            const valFinalMin = Math.max(0, pMin[pMin.length - 1]);
+            const valFinalMax = Math.max(0, pMax[pMax.length - 1]);
+            
+            const deltaPct = ((valFinal - valAtual) / valAtual) * 100;
+
+            document.getElementById('kpi-atual').innerText = formatador.format(Math.round(valAtual));
+            document.getElementById('kpi-projecao').innerText = formatador.format(Math.round(valFinal));
+            document.getElementById('kpi-min').innerText = formatador.format(Math.round(valFinalMin));
+            document.getElementById('kpi-max').innerText = formatador.format(Math.round(valFinalMax));
+            
+            const erroMae = Math.abs(valFinalMax - valFinal);
+            document.getElementById('kpi-crescimento').innerText = `Var: ${deltaPct > 0 ? '+' : ''}${deltaPct.toFixed(1)}%`;
+            document.getElementById('kpi-mae-txt').innerText = `MAE: ± ${formatador.format(Math.round(erroMae))}`;
+
+            // Atualiza o gráfico com os dados filtrados
+            chart.data.labels = labels;
+            chart.data.datasets[0].data = pMax;
+            chart.data.datasets[1].data = pMin;
+            chart.data.datasets[2].data = pBase;
+            chart.data.datasets[3].data = hist;
+            chart.update();
+        }
+
+        // Adicionado 'hist' no parâmetro para evitar o erro do "índice 12" hardcoded
+        function atualizarTabela(hist, pBase, pMin, pMax, labels) {
+            const tbody = document.getElementById('tabela-corpo');
+            tbody.innerHTML = '';
+            
+            for(let i = 0; i < pBase.length; i++) {
+                // Desenha a tabela apenas para os meses em que o histórico é nulo
+                if (hist[i] === null && pBase[i] !== null) {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="color: #e2e8f0; font-weight: 500;">${labels[i]}</td>
+                        <td><span class="badge-min">${formatador.format(Math.max(0, Math.round(pMin[i])))}</span></td>
+                        <td style="color: var(--blue-accent); font-weight: 700;">${formatador.format(Math.max(0, Math.round(pBase[i])))}</td>
+                        <td><span class="badge-max">${formatador.format(Math.max(0, Math.round(pMax[i])))}</span></td>
+                    `;
+                    tbody.appendChild(tr);
+                }
+            }
+        }
+
+        function exportarCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,Periodo,Estado,Cenario_Pessimista,Target_Base,Cenario_Otimista\n";
+            dadosParaExportacao.forEach(row => {
+                csvContent += `${row.periodo},${row.estado},${row.cotas_min},${row.cotas_base},${row.cotas_max}\n`;
+            });
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `consorcio_predict_${document.getElementById('estado').value}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        document.getElementById('estado').addEventListener('change', gerarDados);
+        document.getElementById('meses').addEventListener('input', gerarDados);
+
+        gerarDados();
+    </script>
+</body>
+</html>
