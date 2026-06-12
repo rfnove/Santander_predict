@@ -30,7 +30,7 @@ Estes parâmetros foram injetados diretamente na instância do objeto Prophet() 
 •	growth = 'linear' (Tipo de Crescimento): Mantido no padrão linear por partes (piecewise linear). O modelo assume que o estoque de cotas ativas cresce ou diminui seguindo taxas lineares que podem mudar de velocidade em determinados pontos cruciais do histórico (changepoints).
 
 
-#DEPLOY, SERIALIZAÇÃO E ARQUITETURA DA API
+# DEPLOY, SERIALIZAÇÃO E ARQUITETURA DA API
 Com o modelo validado e aprovado, o pipeline foi estruturado para produção através de automação em Python:
 
 Treinamento em Massa: Um loop percorreu a base de dados, instanciou e treinou 27 modelos independentes para os estados e centenas de modelos para as administradoras.
