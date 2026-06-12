@@ -4,7 +4,7 @@
 ![Flask](https://img.shields.io/badge/flask-%23000.svg?style=for-the-badge&logo=flask&logoColor=white)
 ![Prophet](https://img.shields.io/badge/Facebook_Prophet-8A2BE2?style=for-the-badge)
 
-Este repositório contém o pipeline fim a fim de engenharia de dados, modelagem preditiva e deploy de microsserviço para projeção do mercado de consórcios no cenário de 2026.
+Este repositório contém o pipeline  de engenharia de dados, modelagem preditiva e deploy de microsserviço para projeção do mercado de consórcios no cenário de 2026.
 
 ---
 
